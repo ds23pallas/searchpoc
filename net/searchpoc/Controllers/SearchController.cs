@@ -34,36 +34,58 @@ namespace searchpoc.Controllers
         {
             var client = GetESClient();
 
-
-            MatchPhraseQueryDescriptor<object> queryDescriptor = new MatchPhraseQueryDescriptor<object>();
-            
+            ISearchResponse<object> result = null;
+            IReadOnlyCollection<object> products = null;
 
             if(!string.IsNullOrEmpty(articleId))
             {
-                queryDescriptor
-                    .Field("id")
-                    .Query(articleId);                                   
+                result = IdSearch(client, articleId);
             }
 
             if(!string.IsNullOrEmpty(name))
             {
-                queryDescriptor
-                    .Field("name")
-                    .Query("*" + name + "*");
+                result = WildcardSearch(client, name);   
             }
 
             
-            var searchResult = client.Search<object>(s => s
-                .Query(
-                    q => q.MatchPhrase(q => queryDescriptor)                    
-                    )
-               .AnalyzeWildcard(true)
-            );
-            
+            if(result!=null)
+            {
+                products = result.Documents;
+            }
 
-            var products = searchResult.Documents;
+            
             return products;
             
+        }
+
+        private ISearchResponse<object> WildcardSearch(ElasticClient client, string name)
+        {
+            var queryDescriptor = new WildcardQueryDescriptor<object>();
+            queryDescriptor.Wildcard("*");
+            queryDescriptor.Field("name");
+            queryDescriptor.Value("*" + name + "*");
+
+            var searchResult = client.Search<object>(s => s
+                .Query(
+                    q => q.Wildcard(qd => queryDescriptor)                    
+                 )               
+            );
+
+            return searchResult;
+        }
+
+        private ISearchResponse<object> IdSearch(ElasticClient client, string id)
+        {
+            var queryDescriptor = new MatchPhraseQueryDescriptor<object>();
+            queryDescriptor.Field("id");
+            queryDescriptor.Query(id);
+
+            var searchResult = client.Search<object>(s => s
+               .Query(               
+                   q => q.MatchPhrase(q => queryDescriptor)                    
+               )              
+            );
+            return searchResult;
         }
 
 
